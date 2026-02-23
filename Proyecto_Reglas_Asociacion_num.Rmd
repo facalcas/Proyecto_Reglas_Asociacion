@@ -1,8 +1,10 @@
 ---
 title: "Proyecto Reglas Asociación"
-subitle: "Máster Oficial Ciencia Datos-UV"
 author: "alumnos"
-output: html_notebook
+subitle: "Máster Oficial Ciencia Datos-UV"
+output:
+  html_document:
+    df_print: paged
 ---
 
 ## Qualitative Bankruptcy Data Set
@@ -13,7 +15,7 @@ Cargar el fichero `Qualitative_Bankruptcy.num.txt` y crear el `data.frame` `QB`.
 
 ```{r}
 #solucion
-
+QB<-read.csv("Qualitative_Bankruptcy.num.txt",header=F,sep=",")
 ```
 
 Asigna nombres válidos a las columnas del `data.frame` (usa `make.names` para asegurarte que no contiene símbolos raros). Más información en el fichero `Qualitative_Bankruptcy.info.txt`
@@ -27,16 +29,38 @@ colnames(QB) <- make.names(c("Industrial Risk", "Management Risk",
 
 Sabiendo que las variables numéricas representan un valor entre 0 y 10 para indicar la valoración del experto de cada variable, prueba a discretizar las variables numéricas en 3 factores ordenados **QB** de ***manera no supervisada*** para estimar la clase (`Bankruptcy`). La etiqueta asociada a valores bajos será "N" de valoración "negative", la etiqueta de valores altos será "P" de "positive" y el resto corresponderá a etiqueta "A" de "average".
 
+```{r,message=FALSE,warning=FALSE}
+#solucion
+library(arules)
+
+hist(QB$Industrial.Risk, breaks=20, main="Clustering")
+abline(v=discretize(QB$Industrial.Risk, method="cluster", breaks=3, onlycuts=TRUE), col="blue")
+
+hist(QB$Industrial.Risk, breaks=20, main="Equal Interval length")
+abline(v=discretize(QB$Industrial.Risk, method="interval", breaks=3, onlycuts=TRUE), col="red")
+
+hist(QB$Industrial.Risk, breaks=20, main="Equal Frequency")
+abline(v=discretize(QB$Industrial.Risk, method="frequency", breaks=3, onlycuts=TRUE), col="green")
+```
+
+Por los resultados obtenidos en las visualizaciones hechas para comparar los métodos de discretización de manera no supervisada, en la variable Industrial.Risk, se escoge el método de cluster para hacer la separación.
+
 ```{r}
 #solucion
-
+for (i in 1:6){
+  QB[,i]<-discretize(QB[,i], method="cluster", breaks=3, labels=c("N","A","P"),ordered=T)
+}
 ```
 
 Asegúrate que toda las variables son factores de 3 niveles y ORDENADOS que respetan N\<A\<P. La clase `Bankruptcy` debe tener como primera etiqueta "B".
 
 ```{r}
 #solucion
+for (i in 1:6){
+  QB[,i]<-factor(QB[,i],levels=c("N","A","P"),ordered=T)
+}
 
+QB$Bankruptcy<-factor(QB$Bankruptcy,levels=c("B","NB"))
 ```
 
 ## Análisis Cualitativo
@@ -49,12 +73,50 @@ Obtén la descripción de las variables [incluida la clase]{.underline}. Al meno
 
 ```{r}
 #solucion
-
+str(QB)
 ```
+
+```{r}
+#solucion
+lapply(QB,table)
+```
+
+```{r}
+#solucion
+lapply(QB,function(x) prop.table(table(x)))
+```
+
+```{r,message=FALSE,warning=FALSE}
+#solucion
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+
+QB_long<-QB%>%
+  mutate(across(everything(), as.character))%>% 
+  pivot_longer(cols=everything(), 
+               names_to="Variable", 
+               values_to="Categoria")%>%
+  mutate(Categoria = factor(Categoria, levels = c("N", "A", "P", "B", "NB")))
+
+ggplot(QB_long,aes(x=Categoria,fill=Categoria)) +
+  geom_bar() +
+  facet_wrap(~Variable,scales="free_x") + 
+  geom_text(stat='count',aes(label=after_stat(count)),vjust=-0.5,size=3)+ 
+  labs(title="Distribución de Frecuencias") +
+  theme(legend.position = "none")
+```
+
 
 [Describe, al menos, 2 conclusiones.]{.underline}
 
 **\>\>\>\<\<\<Conclusiones del análisis univariante...\>\>\>\<\<\<**
+
+La variable objetivo de BAnkruptcy presenta un equilibrio marcado, en el que el 42.8% (107 registros) presenta casos de bancarota (marcados como "B") y un 57.2% (143 registros) son casos de no bancarato ("NB"). Esto es importante porque un desbalance en estas clases podría afectar con sesgos los resultados que se obtengan con técnicas que se aplicaran posteriormente.
+
+Como se observa en el gráfico de Distribucion de Frecuencias, todas las variables presentan una buena representación en los tres niveles N-A-P,  no hay ningún nivel con una representación significativamente diferente al resto, lo que indica que la discretización realizada logró preservar la varianza de los datos, sin incurrir en un desbalance que afecte a las variables y su aporte en los modelos que se realizarán.
+
+Finalmente, con el resultado obtenido de la estructura del dataset se asegura que todas las variables son factores ordenados con 3 levels que siguen el orden: "N"<"A"<"P", además que la variable Bankruptcy es un factor con los niveles "B" y "NB".
 
 ### Análisis bivariante de las variables Cualitativas
 
@@ -62,21 +124,49 @@ Obtén la relación entre las variables [y la clase]{.underline} (ej. matrices d
 
 *Nota: La función PairApply de la librería DescTools permite calcular estadísticos para todos los pares. La función PlotCorr permite representar los resultados de PairApply.*
 
-```{r}
+```{r,message=FALSE,warning=FALSE}
 #solucion
+library(DescTools)
+lapply(QB[, 1:6], function(x) table(Variable = x, Clase = QB$Bankruptcy))
+```
 
+```{r}
+matrizCramer<-PairApply(QB,CramerV,symmetric = T)
+PlotCorr(matrizCramer)
 ```
 
 Contrasta los resultados con los gráficos de Mosaico de los casos más relevantes.
 
 ```{r}
 #solucion
+mosaicplot(~Competitiveness+Bankruptcy,data=QB,col=c("darkred","darkblue"))
+```
 
+```{r}
+#solucion
+mosaicplot(~Financial.Flexibility+Bankruptcy,data=QB,col=c("darkred","darkblue"))
+```
+
+```{r}
+#solucion
+mosaicplot(~Credibility+Bankruptcy,data=QB,col=c("darkred","darkblue"))
+```
+
+```{r}
+#solucion
+mosaicplot(~Operating.Risk+Bankruptcy,data=QB,col=c("darkred","darkblue"))
 ```
 
 [Describe, al menos, 2 conclusiones:]{.underline}
 
 **\>\>\>\<\<\<Conclusiones del análisis bivariante...\>\>\>\<\<\<**
+
+Analizando la matriz de Cramer, la variable Competitiveness es un factor crítico y con mucho impacto en la identificación de una empresa en bancarota o no. Analizando su gráfico de mosaico, de 105 empresas con calificación negativa en este aspecto, 104 cayeron en bancarota y por el contrario todas las calificadas como P en esta variable, ninguna está en bancarota. 
+Como segundo factor más importante se identificó a Financial.Flexibility, con un comportamiento muy similar al anteriormente mencionado, la falta de flexibilidd financiera arrastra a las empresas a la bancarota.
+
+También se destaca a la Credibility, que también presenta una fuerte asociación con Bankruptcy, su mosaico indica que empresas con una negativa en esta variable se sigue asociando fuertemente a la bancarota, sin embargo ya en estas variables y en siguientes, una calificación de Average presenta mejoras y no es tan seguro la caida en la bancarota.
+
+Finalmente se destaca la variable Operating.Risk, como la variable con un peso menor en Bankruptcy, las proporciones de B y NB están muy mezcladas en todas las columnas, y es el que más se asemeja a una linea horizontal perfecta justo en el medio de los mosaicos. Esto puede ayudar a concluir que las operaciones día a día no son el motivo principal de bancarota, debido a que hay empresas calificadas como P que igual quebraron. Lo que indica que el problema reside en variables como la competitividad en el mercado y la flexibilidad financiera de la empresa.
 
 ## Reglas de Asociación
 
