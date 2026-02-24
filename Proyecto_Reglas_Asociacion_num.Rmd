@@ -1,6 +1,6 @@
 ---
 title: "Proyecto Reglas Asociación"
-author: "alumnos"
+author: "Fabián Calvo y Florencia Pellegrini"
 subitle: "Máster Oficial Ciencia Datos-UV"
 output:
   html_document:
@@ -174,21 +174,30 @@ Transforma el `data.frame` en *transactions* con el nombre `QBt` y analízalas c
 
 ```{r}
 #solution
-
+QBt<-as(QB,'transactions')
+summary(QBt)
 ```
 
 Obtén las reglas de asociación que tienen, al menos, un `support` del 10% y una `confidence` del 100%. ¿Cuántas reglas se obtienen?
 
 ```{r}
 #solution
-
+reglas<-apriori(QBt, parameter = list(supp=0.1,
+                                    conf=1,
+                                    minlen=1,
+                                    maxlen=10,
+                                    target="rules"),
+                 control=list(verbose=T))
 ```
+Se obtienen 88 reglas.
 
 Muestra las 3 primeras reglas ordenadas por `lift`.
 
 ```{r}
 #solution
-
+reglas_selec<-subset(reglas, subset = lift>1)
+reglas_selec<-sort(reglas_selec,by="lift", decreasing=T)
+inspect(head(reglas_selec, 3))
 ```
 
 Obtén las reglas de asociación que tengan como **ANTECEDENTE** `Bankruptcy=B` . Reduce el número de reglas con las condiciones `lift>2 & count>50`. ¿Observas algún patrón/curiosidad en estas reglas?
@@ -197,15 +206,38 @@ Obtén las reglas de asociación que tengan como **ANTECEDENTE** `Bankruptcy=B` 
 
 ```{r}
 #solucion
-
+reglas_conB<-subset(reglas, subset = lhs %in% "Bankruptcy=B" & lift>2 & count>50)
+reglas_conB<- sort(reglas_conB, by="lift", decreasing=TRUE)
+inspect(reglas_conB)
+plot(reglas_conB, method="graph", engine="graphviz")
 ```
+Teniendo en cuenta que:
+- En todas las reglas obtenidas, el consecuente final es Competitiveness=N. 
+- El tamaño del nodo representa el support, indicando que el nodo más grande es la combinación de items con más support (que más veces se repite en el dataset). El color del nodo viene dado por el lift, y dado que todos presentan el mismo valor, el color es idéntico. Un lift identico representa una asociación fuerte entre los antecedentes y el consecuente. 
+
+Conclusiones:
+- Hay una relación directa entre que una empresa esté en  bancarrota (Bankrupcy=B) y que esta tenga una competitivad negativa (Competitiveness=N). 
+- Además, hay ciertas combinaciones, como estar en bancarrota y tener un riesgo de operación negativo (Operating.Risk=N), que conllevan una competitividad negativa el 25% de las veces en el conjunto de datos.
+- El hecho de que obtengamos el mismo lift para todas las reglas indica que las variables estan correlacionadas entre sí y actúan en bloque. Por lo tanto, el hecho de que una empresa presente uno de los antecedentes del gráfico, como por ejemplo falta de credibilidad, implica que esta suele tener el resto de antecedentes también, como falta de flexibilidad financiera, riesgo industrial, etc.
+
 
 Obtén las reglas de asociación en las que **no** aparezca la variable`Bankruptcy` (ni en el antecedente ni en la consecuencia). Representa las reglas. ¿Para qué sirven estas reglas/grafo si no aparece la variable objetivo?
 
 ```{r}
 #solucion
-
+reglas_sinB<-subset(reglas, subset = !(items %pin% "Bankruptcy"))
+reglas_sinB<- sort(reglas_sinB, by="lift", decreasing=TRUE)
+inspect(reglas_sinB)
+plot(reglas_sinB, method="graph", engine="graphviz")
 ```
+Estas reglas son útiles por los siguientes motivos:
+- En el grafo se ve que la falta de competitividad (Competitiveness=N) actúa como consecuente de todas las asociaciones. Dado que anteriormente vimos que la falta de competitividad está casi siempre ligada a la bancarrota, estas reglas nos enseñan qué "síntomas" aparecen antes de la bancarrota.
+
+- El grafo muestra combinaciones frecuentes como Credibility=N, Operating.Risk=N y Financial.Flexibility=N. Esto sirve porque, una empresa puede no estar en bancarrota aún, pero si cumple estas reglas, sabemos que probablemente su competitividad caerá, lo que eventualmente la llevará a la bancarrota.
+
+- En el grafo vemos la comprobación de que las variables no son independientes y están muy relacionadas entre sí.
+
+- Las reglas nos permiten ver no solo la consecuencia final (la bancarrota) sino los distintos mecanismos los cuales pueden llevar a esto. 
 
 ## Predicción con reglas de asociación
 
@@ -214,8 +246,28 @@ Desarrolla un modelo de clasificación basado en reglas de asociación para esti
 ```{r}
 set.seed(666)
 #solucion
+library(caret, quietly = TRUE)
+library(arules)
+library(arulesCBA)
 
+trainIndex<-createDataPartition(QB$Bankruptcy, times=1, p=0.8, list=F)
+
+modelCBA<-CBA(Bankruptcy~.,data=QB[trainIndex,], parameter= list(supp=0.01, conf=0.5, minlen=1, maxlen=10), control=list(verbose=T))
+modelCBA
+
+#train
+prediction_train<-predict(modelCBA,QB[trainIndex,])
+prediction_train=factor(prediction_train,levels=c("B","NB"))
+reference_train=QB[trainIndex,]$Bankruptcy
+confusionMatrix(prediction_train,reference_train)
+
+#test
+prediction_test<-predict(modelCBA,QB[-trainIndex,])
+prediction_test=factor(prediction_test,levels=c("B","NB"))
+reference_test=QB[-trainIndex,]$Bankruptcy
+confusionMatrix(prediction_test,reference_test)
 ```
+De esta manera comprobamos que el modelo tiene una sensibilidad y especificidad de 1, implicando un clasificador perfecto para este dataset.
 
 [Reflexiones sobre el modelo basado en reglas:]{.underline}
 
@@ -223,4 +275,14 @@ set.seed(666)
 
 ¿has utilizado todas las variables en el modelo y por qué?
 
+Sí, al entrenar el modelo incluimos todas las variables para que el algoritmo CBA sea capaz de explorar todas las combinaciones de variables y reglas posibles, de manera de aprovechar los datos lo máximo posible.
+Sin embargo, como al final el algoritmo selecciona solo 6 reglas, este filtró y se quedo unicamente con las variables con mayor poder predictivo.
+
 ¿has seleccionado reglas y por qué? ¿en base a qué criterio?
+
+Sí, el algoritmo selecciono 6 reglas. El criterio que usa para seleccionarlas es el siguiente:
+1. Selecciona las reglas con mayor confianza.
+2. Selecciona las reglas con mayor soporte, indicando una mayor frecuencia en el conjunto de datos. 
+3. Selecciona reglas optimas para clasificación, eliminando/podando aquellas innecesarias o redundantes. 
+
+El algoritmo selecciona reglas para evitar el overfitting, obteniendo un modelo aplicable a distintos datasets. Además, de esta manera se obtiene un modelo más eficiente, rápido de usar e interpretable, que con tan solo 6 reglas explica todos los casos con un 100% de sensibilidad y especificidad tanto en el conjunto de train como de test.
