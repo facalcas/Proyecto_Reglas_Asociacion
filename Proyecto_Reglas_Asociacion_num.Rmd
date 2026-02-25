@@ -206,6 +206,7 @@ Obtén las reglas de asociación que tengan como **ANTECEDENTE** `Bankruptcy=B` 
 
 ```{r}
 #solucion
+library(arulesViz)
 reglas_conB<-subset(reglas, subset = lhs %in% "Bankruptcy=B" & lift>2 & count>50)
 reglas_conB<- sort(reglas_conB, by="lift", decreasing=TRUE)
 inspect(reglas_conB)
