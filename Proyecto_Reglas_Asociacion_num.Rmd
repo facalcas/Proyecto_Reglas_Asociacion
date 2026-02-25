@@ -189,6 +189,7 @@ reglas<-apriori(QBt, parameter = list(supp=0.1,
                                     target="rules"),
                  control=list(verbose=T))
 ```
+
 Se obtienen 88 reglas.
 
 Muestra las 3 primeras reglas ordenadas por `lift`.
@@ -212,6 +213,7 @@ reglas_conB<- sort(reglas_conB, by="lift", decreasing=TRUE)
 inspect(reglas_conB)
 plot(reglas_conB, method="graph", engine="graphviz")
 ```
+
 Teniendo en cuenta que:
 - En todas las reglas obtenidas, el consecuente final es Competitiveness=N. 
 - El tamaño del nodo representa el support, indicando que el nodo más grande es la combinación de items con más support (que más veces se repite en el dataset). El color del nodo viene dado por el lift, y dado que todos presentan el mismo valor, el color es idéntico. Un lift identico representa una asociación fuerte entre los antecedentes y el consecuente. 
@@ -220,7 +222,6 @@ Conclusiones:
 - Hay una relación directa entre que una empresa esté en  bancarrota (Bankrupcy=B) y que esta tenga una competitivad negativa (Competitiveness=N). 
 - Además, hay ciertas combinaciones, como estar en bancarrota y tener un riesgo de operación negativo (Operating.Risk=N), que conllevan una competitividad negativa el 25% de las veces en el conjunto de datos.
 - El hecho de que obtengamos el mismo lift para todas las reglas indica que las variables estan correlacionadas entre sí y actúan en bloque. Por lo tanto, el hecho de que una empresa presente uno de los antecedentes del gráfico, como por ejemplo falta de credibilidad, implica que esta suele tener el resto de antecedentes también, como falta de flexibilidad financiera, riesgo industrial, etc.
-
 
 Obtén las reglas de asociación en las que **no** aparezca la variable`Bankruptcy` (ni en el antecedente ni en la consecuencia). Representa las reglas. ¿Para qué sirven estas reglas/grafo si no aparece la variable objetivo?
 
@@ -231,6 +232,7 @@ reglas_sinB<- sort(reglas_sinB, by="lift", decreasing=TRUE)
 inspect(reglas_sinB)
 plot(reglas_sinB, method="graph", engine="graphviz")
 ```
+
 Estas reglas son útiles por los siguientes motivos:
 - En el grafo se ve que la falta de competitividad (Competitiveness=N) actúa como consecuente de todas las asociaciones. Dado que anteriormente vimos que la falta de competitividad está casi siempre ligada a la bancarrota, estas reglas nos enseñan qué "síntomas" aparecen antes de la bancarrota.
 
@@ -268,6 +270,7 @@ prediction_test=factor(prediction_test,levels=c("B","NB"))
 reference_test=QB[-trainIndex,]$Bankruptcy
 confusionMatrix(prediction_test,reference_test)
 ```
+
 De esta manera comprobamos que el modelo tiene una sensibilidad y especificidad de 1, implicando un clasificador perfecto para este dataset.
 
 [Reflexiones sobre el modelo basado en reglas:]{.underline}
