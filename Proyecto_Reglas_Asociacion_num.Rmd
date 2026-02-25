@@ -204,7 +204,7 @@ Obtén las reglas de asociación que tengan como **ANTECEDENTE** `Bankruptcy=B` 
 
 *Nota: Representar las reglas ayuda en la interpretación.*
 
-```{r}
+```{r,message=FALSE,warning=FALSE}
 #solucion
 library(arulesViz)
 reglas_conB<-subset(reglas, subset = lhs %in% "Bankruptcy=B" & lift>2 & count>50)
@@ -244,7 +244,7 @@ Estas reglas son útiles por los siguientes motivos:
 
 Desarrolla un modelo de clasificación basado en reglas de asociación para estimar la Bancarrota. Comprueba la bondad del modelo (sensibilidad y especificidad) dividiendo el conjunto de datos en Entrenamiento 80% y Test 20%. Utiliza la función `createDataPartition` y `confusionMatrix` del paquete `caret`.
 
-```{r}
+```{r,message=FALSE,warning=FALSE}
 set.seed(666)
 #solucion
 library(caret, quietly = TRUE)
